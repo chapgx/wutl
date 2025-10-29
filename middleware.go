@@ -8,13 +8,21 @@ import (
 	"strings"
 )
 
-type SkipFn func() bool
+type SkipFn func(r *http.Request) bool
 
 // ServeEmbedded returns a [HandlerFn] that serves embedde files from fileSys, root determines the root dir. You can pass optional
 // skiprules if you want specific files to be handled differently
-func ServeEmbedded(fileSys embed.FS, root string, skipsrules ...SkipFn) HandlerFn {
+func ServeEmbedded(fileSys embed.FS, root string, skiprules ...SkipFn) HandlerFn {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+			for _, fn := range skiprules {
+				if fn(r) {
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+
 			ext := filepath.Ext(r.URL.Path)
 			if ext == "" {
 				next.ServeHTTP(w, r)
