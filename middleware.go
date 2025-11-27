@@ -4,6 +4,7 @@ import (
 	"embed"
 	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -45,6 +46,36 @@ func ServeEmbedded(fileSys embed.FS, root string, skiprules ...SkipFn) HandlerFn
 			}
 
 			http.ServeContent(w, r, r.URL.Path, stats.ModTime(), seeker)
+		})
+	}
+}
+
+// ServerFiles serves static files from specified root
+func ServeFiles(root string) HandlerFn {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+			ext := filepath.Ext(r.URL.Path)
+			if ext == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			path, e := sanitize_path(root, r.URL.Path)
+			if e == ErrDirOutOfBounds {
+				http.Error(w, "resource nout found", http.StatusNotFound)
+				return
+			}
+
+			f, e := os.OpenFile(path, os.O_RDONLY, os.ModePerm)
+			if e != nil {
+				http.Error(w, e.Error(), http.StatusInternalServerError)
+				return
+			}
+			defer f.Close()
+
+			stats, _ := f.Stat()
+			http.ServeContent(w, r, r.URL.Path, stats.ModTime(), f)
 		})
 	}
 }
