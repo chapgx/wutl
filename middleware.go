@@ -3,10 +3,11 @@ package wutl
 import (
 	"embed"
 	"io"
-	"mime"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -32,8 +33,12 @@ func ServeEmbedded(fileSys embed.FS, root string, skiprules ...SkipFn) HandlerFn
 			}
 
 			path := filepath.Join(root, strings.TrimPrefix(r.URL.Path, "/"))
+			if runtime.GOOS == "windows" {
+				path = strings.ReplaceAll(path, "\\", "/")
+			}
 			f, e := fileSys.Open(path)
 			if e != nil {
+				log.Println("[wutl error]", e)
 				http.NotFound(w, r)
 				return
 			}
@@ -42,12 +47,13 @@ func ServeEmbedded(fileSys embed.FS, root string, skiprules ...SkipFn) HandlerFn
 			stats, _ := f.Stat()
 			seeker, ok := f.(io.ReadSeeker)
 			if !ok {
+				log.Println("[wutl error]", "file does not implement io.ReadSeeker inteface")
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 
-			mimetype := mime.TypeByExtension(ext)
-			w.Header().Set("Content-Type", mimetype)
+			// mimetype := mime.TypeByExtension(ext)
+			// w.Header().Set("Content-Type", mimetype)
 
 			http.ServeContent(w, r, r.URL.Path, stats.ModTime(), seeker)
 		})
