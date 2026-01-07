@@ -3,6 +3,7 @@ package wutl
 import (
 	"embed"
 	"io"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -44,6 +45,9 @@ func ServeEmbedded(fileSys embed.FS, root string, skiprules ...SkipFn) HandlerFn
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
+
+			mimetype := mime.TypeByExtension(ext)
+			w.Header().Set("Content-Type", mimetype)
 
 			http.ServeContent(w, r, r.URL.Path, stats.ModTime(), seeker)
 		})
